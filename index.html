@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Socket.IO Client</title>
+    <!-- Подключение библиотеки Socket.IO -->
+    <script
+      src="https://cdn.socket.io/4.7.5/socket.io.min.js"
+      integrity="sha384-2huaZvOR9iDzHqslqwpR87isEmrfxqyWOF7hr7BY6KG0+hVKLoEXMPUJw3ynWuhO"
+      crossorigin="anonymous"></script>
+    <script>
+      console.log(window.localStorage.getItem("token"));
+
+      // Подключение к серверу
+      const socket = io("http://localhost:5000", {
+        query: {
+          token: window.localStorage.getItem("token"),
+        },
+      });
+
+      // Обработка события успешного подключения
+      socket.on("connect", () => {
+        console.log("Подключение установлено");
+      });
+
+      // Обработка события отключения
+      socket.on("disconnect", () => {
+        console.log("Подключение разорвано");
+      });
+
+      // Пример отправки сообщения на сервер
+      function sendMessage() {
+        const messageInput = document.getElementById("messageInput");
+        const message = messageInput.value;
+        socket.emit("chat message", message);
+        messageInput.value = ""; // Очистить поле ввода
+      }
+
+      socket.on("newToken", (data) => {
+        console.log(data);
+        console.log(window.localStorage.getItem("token"));
+        window.localStorage.setItem("token", data.token);
+      });
+
+      // Обработка приема сообщения от сервера
+      socket.on("chat message", (msg) => {
+        const messagesList = document.getElementById("messagesList");
+        const listItem = document.createElement("li");
+        listItem.textContent = msg;
+        messagesList.appendChild(listItem);
+      });
+
+      const deleteStorage = () => {
+        localStorage.removeItem("token");
+        console.log('token удален!');
+      };
+    </script>
+  </head>
+  <body>
+    <h1>Socket.IO Client</h1>
+    <input type="text" id="messageInput" placeholder="Введите сообщение" />
+    <button onclick="sendMessage()">Отправить</button>
+    <button onclick="deleteStorage()">Удалить token</button>
+    <ul id="messagesList"></ul>
+  </body>
+</html>
