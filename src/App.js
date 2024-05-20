@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from "react";
 import io from "socket.io-client";
 import "./App.css";
+import { SearchListUsers } from "./Components/SearchListUsers/SearchListUsers";
+import { createTimer } from "./timer";
+import { Question } from "./Components/Question/question";
+
+const statusDev = true;
+const keyTokenName = `${Date.now()}`;
+
+console.log(keyTokenName);
 
 const socket = io("http://192.168.101.2:5000", {
   query: {
-    token: window.localStorage.getItem("token"),
+    token: !statusDev
+      ? window.localStorage.getItem("token")
+      : window.localStorage.getItem(keyTokenName),
   },
 });
 
@@ -12,13 +22,20 @@ console.log(window.localStorage.getItem("token"));
 
 function App() {
   const [message, setMessage] = useState("");
+  const [account, setAccount] = useState({});
   const [chat, setChat] = useState([]);
   const [appState, setAppState] = useState("home");
   const [users, setUsers] = useState([]);
+  const [room, setRoom] = useState({});
+
+  const [timeOutStatus, setTimeOutStatus] = useState(false);
+  const [timerQuestion, setTimerQuestion] = useState(0);
+  const [timerBeforeStart, setTimerBeforeStart] = useState(0);
+  const [question, setQuestion] = useState(null);
 
   const deleteToken = () => {
-    console.log("token deleted!");
-    window.localStorage.removeItem("token");
+    // console.log("token deleted!");
+    // window.localStorage.removeItem("token");
   };
 
   useEffect(() => {
@@ -26,18 +43,54 @@ function App() {
       setChat([...chat, msg]);
     });
 
+    socket.on("account", (data) => {
+      console.log(data);
+      setAccount(data);
+    });
+
     socket.on("newToken", (data) => {
-      window.localStorage.setItem("token", data.token);
+      !statusDev
+        ? window.localStorage.setItem("token", data.token)
+        : window.localStorage.setItem(keyTokenName, data.token);
       socket.token = { token: data.token };
+
+      // window.localStorage.setItem("token", data.token);
+      // socket.token = { token: data.token };
     });
     socket.on("joinRoom", (data) => {
-      setUsers(data)
+      setUsers('joinroom');
+      if (data) {
+        setRoom(data);
+        setAppState("selection");
+      }
     });
-  }, [chat]);
+    socket.on("leaveRoom", (data) => {
+      setUsers(data || []);
+    });
+
+    socket.on("timerBeforeStart", (data) => {
+      console.log("timerBeforeStart");
+      setTimeOutStatus(true);
+      setAppState("game");
+      createTimer(setTimerBeforeStart, data.timeOut, () => {
+        console.log("Timer 1 has finished");
+      });
+    });
+
+    socket.on("start", (data) => {
+      console.log("start");
+
+      setTimeOutStatus(false);
+    });
+
+    socket.on("question", (data) => {
+      console.log('Объект вопроса:');
+      setQuestion(data);
+    });
+  }, []);
 
   const sendMessage = (e) => {
     e.preventDefault();
-    console.log("dsfsdfdsfsaf");
     socket.emit("message", message);
     setMessage("");
   };
@@ -48,21 +101,25 @@ function App() {
   };
   const leaveGame = () => {
     socket.emit("leaveRoom", true);
+    setAppState("home");
+    setRoom([]);
+    setUsers([]);
   };
 
   useEffect(() => {
-    if(users.length < 4) {
-      setAppState('selection')
-    } else if(users.length = 4) {
-      setAppState('game')
-    }
-  }, [users])
-  
+    console.log(timerBeforeStart);
+  }, [timerBeforeStart]);
+
+  console.log(appState);
 
   return (
     <div className="container">
       <div className="game-canvas">
         <div>
+          <p className="name-box">
+            Ваше имя:{" "}
+            <span className="account-name">{account.anonim_name}</span>
+          </p>
           {appState === "home" && (
             <>
               <button onClick={searchGame}>Найти игру</button>
@@ -72,17 +129,21 @@ function App() {
             <>
               <p>Идет поиск игры....</p>
               <p>Игроки:</p>
-              <ul>
-                {users.map((user, key) => (
-                  <li key={key}>{user.anonim_name || user.name}</li>
-                ))}
-              </ul>
+              <SearchListUsers room={room} account={account} />
               <button onClick={leaveGame}>Отменить поиск</button>
             </>
           )}
           {appState === "game" && (
             <>
-              <div></div>
+              <div>
+                {timeOutStatus && (
+                  <p>Игра начнется через: {timerBeforeStart ? timerBeforeStart : ''}</p>
+                )}
+                {
+                  question && <Question question={question} />
+                }
+
+              </div>
             </>
           )}
         </div>
